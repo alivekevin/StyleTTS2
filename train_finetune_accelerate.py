@@ -1,3 +1,13 @@
+import os
+import sys
+if os.path.exists("runtime"):
+    # Get the directory where the script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Add this directory to sys.path
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+
 # load packages
 import random
 import yaml
@@ -50,15 +60,29 @@ handler = StreamHandler()
 handler.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 
+def preprocess_yaml(file_path):
+    '''For windows due to copying paths resulting in backslashes'''
+    with open(file_path, 'r') as file:
+        content = file.read()
+    
+    # Replace all backslashes with forward slashes
+    content = content.replace('\\', '/')
+    
+    # Load the YAML content safely
+    config = yaml.safe_load(content)
+    
+    return config
 
 @click.command()
 @click.option('-p', '--config_path', default='Configs/config_ft.yml', type=str)
 def main(config_path):
-    config = yaml.safe_load(open(config_path))
+    config = preprocess_yaml(config_path)
+    
     
     log_dir = config['log_dir']
     if not osp.exists(log_dir): os.makedirs(log_dir, exist_ok=True)
-    shutil.copy(config_path, osp.join(log_dir, osp.basename(config_path)))
+    if not osp.join(log_dir, osp.basename(config_path)):
+        shutil.copy(config_path, osp.join(log_dir, osp.basename(config_path)))
     writer = SummaryWriter(log_dir + "/tensorboard")
 
     # write logs
@@ -93,6 +117,18 @@ def main(config_path):
     
     train_list, val_list = get_data_path_list(train_path, val_path)
     device = accelerator.device
+    
+    def filter_existing_audio_files(data_list, root_path):
+        filtered_list = []
+        for item in data_list:
+            audio_path = os.path.join(root_path, os.path.basename(item.split("|")[0]))
+            if os.path.isfile(audio_path):
+                filtered_list.append(item)
+        return filtered_list
+    
+    # Filter the lists to keep only existing audio files
+    train_list = filter_existing_audio_files(train_list, root_path)
+    val_list = filter_existing_audio_files(val_list, root_path)
 
     train_dataloader = build_dataloader(train_list,
                                         root_path,
@@ -311,8 +347,8 @@ def main(config_path):
                 s = model.style_encoder(mel.unsqueeze(0).unsqueeze(1))
                 gs.append(s)
 
-            s_dur = torch.stack(ss).squeeze()  # global prosodic styles
-            gs = torch.stack(gs).squeeze() # global acoustic styles
+            s_dur = torch.stack(ss).squeeze(1)  # global prosodic styles
+            gs = torch.stack(gs).squeeze(1) # global acoustic styles
             s_trg = torch.cat([gs, s_dur], dim=-1).detach() # ground truth for denoiser
 
             bert_dur = model.bert(texts, attention_mask=(~text_mask).int())
@@ -395,7 +431,7 @@ def main(config_path):
                 
             with torch.no_grad():
                 F0_real, _, F0 = model.pitch_extractor(gt.unsqueeze(1))
-                F0 = F0.reshape(F0.shape[0], F0.shape[1] * 2, F0.shape[2], 1).squeeze()
+                F0 = F0.reshape(F0.shape[0], F0.shape[1] * 2, F0.shape[2])#, 1).squeeze()
 
                 N_real = log_norm(gt.unsqueeze(1)).squeeze(1)
                 
@@ -422,7 +458,7 @@ def main(config_path):
 
             loss_mel = stft_loss(y_rec, wav)
             loss_gen_all = gl(wav, y_rec).mean()
-            loss_lm = wl(wav.detach().squeeze(), y_rec.squeeze()).mean()
+            loss_lm = wl(wav.detach().squeeze(1), y_rec.squeeze(1)).mean()
 
             loss_ce = 0
             loss_dur = 0
@@ -612,8 +648,8 @@ def main(config_path):
                         s = model.style_encoder(mel.unsqueeze(0).unsqueeze(1))
                         gs.append(s)
 
-                    s = torch.stack(ss).squeeze()
-                    gs = torch.stack(gs).squeeze()
+                    s = torch.stack(ss).squeeze(1)
+                    gs = torch.stack(gs).squeeze(1)
                     s_trg = torch.cat([s, gs], dim=-1).detach()
 
                     bert_dur = model.bert(texts, attention_mask=(~text_mask).int())
@@ -666,7 +702,7 @@ def main(config_path):
                     s = model.style_encoder(gt.unsqueeze(1))
 
                     y_rec = model.decoder(en, F0_fake, N_fake, s)
-                    loss_mel = stft_loss(y_rec.squeeze(), wav.detach())
+                    loss_mel = stft_loss(y_rec.squeeze(1), wav.detach())
 
                     F0_real, _, F0 = model.pitch_extractor(gt.unsqueeze(1)) 
 
