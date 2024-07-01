@@ -14,4 +14,6 @@ einops-exts
 tqdm
 typing
 typing-extensions
+phonemizer
+gradio
 git+https://github.com/resemble-ai/monotonic_align.git

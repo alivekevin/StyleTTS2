@@ -1,0 +1,5 @@
+*
+!.gitignore
+!OOD_texts.txt
+!train_list.txt
+!val_list.txt
