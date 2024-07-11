@@ -1,7 +1,7 @@
 '''
 Things that I need to work on:
     - Defaults button
-    - Refresh voices list button
+
 '''
 
 import gradio as gr
@@ -24,10 +24,11 @@ sampler = None
 textcleaner = None
 to_mel = None
 
-def load_all_models(voice):
+def load_all_models(voice, model_path=None):
     global global_phonemizer, model, model_params, sampler, textcleaner, to_mel
     config = load_configurations(get_model_configuration(voice))
-    model_path = load_voice_model(voice)
+    if not model_path:
+        model_path = load_voice_model(voice)
     sigma_value = config['model_params']['diffusion']['dist']['sigma_data']
     
     model, model_params = load_models_webui(sigma_value, device)
@@ -57,7 +58,7 @@ def get_model_configuration(voice):
 def load_voice_model(voice):
     return get_file_path(root_path="Models", voice=voice, file_extension=".pth", error_message="No TTS model found in specified location")
 
-def generate_audio(text, voice, reference_audio_file, seed, alpha, beta, diffusion_steps, embedding_scale, voices_root="voices",):
+def generate_audio(text, voice, reference_audio_file, seed, alpha, beta, diffusion_steps, embedding_scale, voice_model, voices_root="voices",):
     original_seed = int(seed)
     reference_audio_path = os.path.join(voices_root, voice, reference_audio_file)
     reference_dicts = {f'{voice}': f"{reference_audio_path}"}
@@ -86,11 +87,12 @@ def generate_audio(text, voice, reference_audio_file, seed, alpha, beta, diffusi
         "text": text,
         "voice": voice,
         "reference_audio_file": reference_audio_file,
-        "seed": seed_value if original_seed == -1 else original_seed,
+        "seed": original_seed if original_seed == -1 else seed_value,
         "alpha": alpha,
         "beta": beta,
         "diffusion_steps": diffusion_steps,
-        "embedding_scale": embedding_scale
+        "embedding_scale": embedding_scale,
+        "voice_model" : voice_model
     })
 
 
@@ -106,19 +108,38 @@ def get_reference_audio_list(voice_name, root="voices"):
     reference_directory_list = os.listdir(os.path.join(root, voice_name))
     return reference_directory_list
 
+def get_voice_models(voice):
+    model_root = "Models"
+    model_path = os.path.join(model_root,voice)
+    model_list = [model_name for model_name in os.listdir(model_path) if model_name.endswith(".pth")]
+    return model_list
+
 def update_reference_audio(voice):
-    return gr.Dropdown(choices=get_reference_audio_list(voice))
+    return gr.Dropdown(choices=get_reference_audio_list(voice), value=get_reference_audio_list(voice)[0])
+
+def update_voice_model(voice, model_name):
+    gr.Info("Wait for models to load...")
+    model_path = get_models_path(voice, model_name)
+    load_all_models(voice=voice, model_path=model_path)
+    gr.Info("Models finished loading")
+
+def get_models_path(voice, model_name, root="Models"):
+    return os.path.join(root, voice, model_name)
 
 def update_voice_settings(voice):
     try:
-        gr.Info("Wait for models to load...")        
-        load_all_models(voice)
+        gr.Info("Wait for models to load...")
+        model_name = get_voice_models(voice)    
+        model_path = get_models_path(voice, model_name[0])   
+        load_all_models(voice, model_path=model_path)
         ref_aud_path = update_reference_audio(voice)
+        
         gr.Info("Models finished loading")
-        return ref_aud_path
+        return ref_aud_path, gr.Dropdown(choices=model_name, value=model_name[0])
     except:
         gr.Warning("No models found for the chosen voice chosen, new models not loaded")
-        return update_reference_audio(voice)
+        ref_aud_path = update_reference_audio(voice)
+        return ref_aud_path, gr.Dropdown(choices=[]) 
 
 def load_settings():
     try:
@@ -126,26 +147,33 @@ def load_settings():
             return yaml.safe_load(f)
     except FileNotFoundError:
         return {
-            "text": "",
+            "text": "Hello there!",
             "voice": voice_list_with_defaults[0],
             "reference_audio_file": reference_audio_list[0],
             "seed" : "-1",
             "alpha": 0.3,
             "beta": 0.7,
             "diffusion_steps": 30,
-            "embedding_scale": 1.0
+            "embedding_scale": 1.0,
+            "voice_model" : ""
         }
 
 def save_settings(settings):
     with open(SETTINGS_FILE_PATH, "w") as f:
         yaml.safe_dump(settings, f)
-
+        
+def update_button_proxy():
+    voice_list_with_defaults = get_voice_list(append_defaults=True)
+    return gr.Dropdown(choices=voice_list_with_defaults)
+        
 voice_list_with_defaults = get_voice_list(append_defaults=True)
 reference_audio_list = get_reference_audio_list(voice_list_with_defaults[0])
+
 
 # Load models with the default or loaded settings
 initial_settings = load_settings()
 load_all_models(initial_settings["voice"])
+list_of_models = get_voice_models(voice=initial_settings["voice"])
 
 with gr.Blocks() as demo:
     with gr.Tabs():
@@ -159,6 +187,10 @@ with gr.Blocks() as demo:
                         # Row 2: Existing content
                         GENERATE_SETTINGS["voice"] = gr.Dropdown(
                             choices=voice_list_with_defaults, label="Voice", type="value", value=initial_settings["voice"])
+                        
+                        GENERATE_SETTINGS["voice_model"] = gr.Dropdown(
+                            choices=list_of_models, label="Voice Models", type="value", value=initial_settings["voice_model"])
+                        
                         GENERATE_SETTINGS["reference_audio_file"] = gr.Dropdown(
                             choices=get_reference_audio_list(initial_settings["voice"]), label="Reference Audio", type="value", value=initial_settings["reference_audio_file"]
                         )
@@ -188,11 +220,10 @@ with gr.Blocks() as demo:
                             min_width=200  
                         )
                 with gr.Row():
+                    update_button = gr.Button("Update Voices")
                     generate_button = gr.Button("Generate")
                 
-                GENERATE_SETTINGS["voice"].change(fn=update_voice_settings, 
-                                                inputs=GENERATE_SETTINGS["voice"], 
-                                                outputs=GENERATE_SETTINGS["reference_audio_file"])
+                # Clicks
         
                 generate_button.click(generate_audio, 
                                     inputs=[GENERATE_SETTINGS["text"],
@@ -202,14 +233,33 @@ with gr.Blocks() as demo:
                                             GENERATE_SETTINGS["alpha"],
                                             GENERATE_SETTINGS["beta"],
                                             GENERATE_SETTINGS["diffusion_steps"],
-                                            GENERATE_SETTINGS["embedding_scale"]], 
+                                            GENERATE_SETTINGS["embedding_scale"],
+                                            GENERATE_SETTINGS["voice_model"]], 
                                     outputs=[generation_output, seed_output])
+                
+                update_button.click(update_button_proxy,
+                                    outputs=GENERATE_SETTINGS["voice"])
+                
+                # Changes
+                GENERATE_SETTINGS["voice"].change(fn=update_voice_settings, 
+                            inputs=GENERATE_SETTINGS["voice"], 
+                            outputs=[GENERATE_SETTINGS["reference_audio_file"],
+                                     GENERATE_SETTINGS["voice_model"]])
+                
+                GENERATE_SETTINGS["voice_model"].change(fn=update_voice_model,
+                            inputs=[GENERATE_SETTINGS["voice"],
+                                    GENERATE_SETTINGS["voice_model"]])
         
         with gr.TabItem("Training"):
-            training_data = gr.Textbox(label="Enter training data")
-            training_output = gr.Textbox(label="Training Output", interactive=False)
-            train_button = gr.Button("Train")
-            train_button.click(train_model, inputs=training_data, outputs=training_output)
+            with gr.Tabs():
+                with gr.TabItem("Prepare Dataset"):
+                    pass
+                
+                with gr.TabItem("Generate Configuration"):
+                    pass
+                
+                with gr.TabItem("Run Training"):
+                    pass
         
         with gr.TabItem("Settings"):
             settings_input = gr.Textbox(label="Enter setting value")
