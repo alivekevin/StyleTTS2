@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "styletts2"
+version = "1.0"
+description = "Installable package for styletts2"
+authors = [
+    { name = "Jarod Mica" }
+]
+dependencies = [
+    "SoundFile",
+    "torchaudio",
+    "munch",
+    "torch",
+    "pydub",
+    "pyyaml",
+    "librosa",
+    "nltk",
+    "matplotlib",
+    "accelerate",
+    "transformers",
+    "einops",
+    "einops-exts",
+    "tqdm",
+    "typing",
+    "typing-extensions",
+    "phonemizer",
+    "gradio",
+    "git+https://github.com/resemble-ai/monotonic_align.git"
+]
+
+requires-python = ">=3.9"
+
+[project.urls]
+repository = "https://github.com/JarodMica/StyleTTS2"
