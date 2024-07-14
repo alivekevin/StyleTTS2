@@ -9,6 +9,7 @@ description = "Installable package for styletts2"
 authors = [
     { name = "Jarod Mica" }
 ]
+
 dependencies = [
     "SoundFile",
     "torchaudio",
@@ -27,11 +28,18 @@ dependencies = [
     "typing",
     "typing-extensions",
     "phonemizer",
-    "gradio",
-    "git+https://github.com/resemble-ai/monotonic_align.git"
+    "gradio"
 ]
 
 requires-python = ">=3.9"
 
+[project.optional-dependencies]
+monotonic_align = [
+    "monotonic-align @ git+https://github.com/resemble-ai/monotonic_align.git"
+]
+
 [project.urls]
 repository = "https://github.com/JarodMica/StyleTTS2"
+
+[tool.setuptools.packages.find]
+include = ["styletts2", "styletts2.*"]

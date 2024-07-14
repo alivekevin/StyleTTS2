@@ -1,11 +1,11 @@
-log_dir: "Models/LJSpeech"
-save_freq: 5
+log_dir: "Models/mel"
+save_freq: 1
 log_interval: 10
 device: "cuda"
-epochs: 50 # number of finetuning epoch (1 hour of data)
-batch_size: 8
-max_len: 400 # maximum number of frames
-pretrained_model: "Models/LibriTTS/epochs_2nd_00020.pth"
+epochs: 40 # number of finetuning epoch (1 hour of data)
+batch_size: 1
+max_len: 250 # maximum number of frames
+pretrained_model: "Models\pretrain_base_1\epochs_2nd_00020.pth"
 second_stage_load_pretrained: true # set to true if the pre-trained model is for 2nd stage
 load_only_params: true # set to true if do not want to load epoch numbers and optimizer parameters
 
@@ -15,9 +15,9 @@ ASR_path: "Utils/ASR/epoch_00080.pth"
 PLBERT_dir: 'Utils/PLBERT/'
 
 data_params:
-  train_data: "Data/train_list.txt"
-  val_data: "Data/val_list.txt"
-  root_path: "/local/LJSpeech-1.1/wavs"
+  train_data: "Data\mel\train_list.txt"
+  val_data: "Data\mel\val_list.txt"
+  root_path: "Data\mel\audio"
   OOD_data: "Data/OOD_texts.txt"
   min_length: 50 # sample until texts with this size are obtained for OOD texts
 
@@ -92,8 +92,8 @@ loss_params:
     lambda_sty: 1. # style reconstruction loss
     lambda_diff: 1. # score matching loss
     
-    diff_epoch: 10 # style diffusion starting epoch
-    joint_epoch: 30 # joint training starting epoch
+    diff_epoch: 0 # style diffusion starting epoch
+    joint_epoch: 0 # joint training starting epoch
 
 optimizer_params:
   lr: 0.0001 # general learning rate

@@ -27,10 +27,10 @@ if os.path.exists("runtime"):
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
 
-from models import *
-from utils import *
-from text_utils import TextCleaner
-from Modules.diffusion.sampler import DiffusionSampler, ADPM2Sampler, KarrasSchedule
+from styletts2.models import *
+from styletts2.utils import *
+from styletts2.text_utils import TextCleaner
+from styletts2.Modules.diffusion.sampler import DiffusionSampler, ADPM2Sampler, KarrasSchedule
 
 def set_seeds(seed=0):
     torch.manual_seed(seed)
@@ -51,7 +51,7 @@ def load_models(config, device):
     pitch_extractor = load_F0_models(F0_path)
 
     BERT_path = config.get('PLBERT_dir', False)
-    from Utils.PLBERT.util import load_plbert
+    from styletts2.Utils.PLBERT.util import load_plbert
     plbert = load_plbert(BERT_path)
 
     model_params = recursive_munch(config['model_params'])
@@ -174,11 +174,11 @@ def inference(text, ref_s, model, sampler, textclenaer, to_mel, device, model_pa
 def main():
     set_seeds()
 
-    config = load_configurations(r"C:\Users\jarod\OneDrive\Desktop\code\MY_GITHUB_UPLOADS\PACKAGES\StyleTTS2\Models\mel\config_ft.yml")
+    config = load_configurations(r"Models\mel\config_ft.yml")
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model_1 = r"C:\Users\jarod\OneDrive\Desktop\code\MY_GITHUB_UPLOADS\PACKAGES\StyleTTS2\Models\mel\epoch_2nd_00029.pth"
-    model_2 = "Models/ray_1_1000_0_0/epoch_2nd_00007.pth"
+    model_1 = r"Models\mel\epoch_2nd_00029.pth"
+    model_2 = r""
     comparison = False
     
     model, model_params = load_models(config, device)
@@ -192,8 +192,8 @@ def main():
         n_mels=80, n_fft=2048, win_length=1200, hop_length=300)
     mean, std = -4, 4
 
-    text = '''My name, is melunuh.  Have you heard of the finger maidens?'''
-    reference_dicts = {'696_92939': r"C:\Users\jarod\OneDrive\Desktop\code\MY_GITHUB_UPLOADS\PACKAGES\StyleTTS2\Data\mel\audio\file___1_file___1_segment_10.wav"}
+    text = '''Wait a minute, I'm getting Japanese input, but it's not working. '''
+    reference_dicts = {'696_92939': r"Data\mel\audio\file___1_file___1_segment_11.wav"}
     # willa 28
 
     noise = torch.randn(1, 1, 256).to(device)
@@ -203,7 +203,7 @@ def main():
         load_pretrained_model(model, model_path=model_1)
         ref_s = compute_style(path, model, to_mel, mean, std, device)
         
-        wav1 = inference(text, ref_s, model, sampler, textclenaer, to_mel, device, model_params, alpha=0.3, beta=0.7, diffusion_steps=30, embedding_scale=1.0)
+        wav1 = inference(text, ref_s, model, sampler, textclenaer, to_mel, device, model_params, alpha=0.1, beta=0.6, diffusion_steps=30, embedding_scale=1.0)
         rtf = (time.time() - start)
         print(f"RTF = {rtf:5f}")
         print(f"{k} Synthesized:")

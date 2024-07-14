@@ -14,10 +14,10 @@ import phonemizer
 
 from nltk.tokenize import word_tokenize
 from munch import Munch
-from models import *
-from utils import *
-from text_utils import TextCleaner
-from Modules.diffusion.sampler import DiffusionSampler, ADPM2Sampler, KarrasSchedule
+from styletts2.models import *
+from styletts2.utils import *
+from styletts2.text_utils import TextCleaner
+from styletts2.Modules.diffusion.sampler import DiffusionSampler, ADPM2Sampler, KarrasSchedule
 
 
 def maximum_path(neg_cent, mask):
